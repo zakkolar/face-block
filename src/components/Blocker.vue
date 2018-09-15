@@ -149,9 +149,15 @@
         let c = this.canvas;
         fabric.loadSVGFromURL(sticker, function(objects, options){
          let obj = fabric.util.groupSVGElements(objects, options);
-         obj.scaleToWidth(50);
+         obj.scaleToWidth(50).set({left: c.width/2, top: c.height/2}).setCoords();
 
          c.add(obj).renderAll();
+
+        c.setActiveObject(c.item(c.getObjects().length-1));
+
+        c.renderAll();
+
+
         })
       },
       selectionSet(){
@@ -179,40 +185,7 @@
       'selection:updated':this.selectionSet,
       'selection:cleared':this.selectionCleared,
       'mouse:down':this.clearControls,
-      'touch:gesture': function(e) {
-        if (e.e.touches && e.e.touches.length == 2) {
-          pausePanning = true;
-          var point = new fabric.Point(e.self.x, e.self.y);
-          if (e.self.state == "start") {
-            zoomStartScale = canvas.getZoom();
-          }
-          var delta = zoomStartScale * e.self.scale;
-          canvas.zoomToPoint(point, delta);
-          pausePanning = false;
-        }
-      },
-      'object:selected': function() {
-        pausePanning = true;
-      },
-      'selection:cleared': function() {
-        pausePanning = false;
-      },
-      'touch:drag': function(e) {
-        if (pausePanning == false && undefined != e.self.x && undefined != e.self.x) {
-          currentX = e.self.x;
-          currentY = e.self.y;
-          xChange = currentX - lastX;
-          yChange = currentY - lastY;
 
-          if( (Math.abs(currentX - lastX) <= 50) && (Math.abs(currentY - lastY) <= 50)) {
-            var delta = new fabric.Point(xChange, yChange);
-            canvas.relativePan(delta);
-          }
-
-          lastX = e.self.x;
-          lastY = e.self.y;
-        }
-      }
     })
     },
     created(){
