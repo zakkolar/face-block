@@ -1,0 +1,274 @@
+  <template>
+    <div class="hello">
+      <canvas id="imageCanvas" ref="imageCanvas"></canvas>
+      <div id="controls">
+        <label for="imageLoader">
+          <span class="btn btn-primary"><i class="fa fa-image"></i> Upload image</span>
+        </label>
+
+        <button class="btn btn-success" @click="saveImage"><i class="fa fa-save"></i> Save image</button>
+        <button @click="showStickers = !showStickers" id="stickerButton" class="btn btn-info">
+         <i class="fa fa-plus" aria-hidden="true"></i> Add sticker
+        </button>
+        <button class="btn btn-danger" :disabled="!selection" @click="removeItem"><i class="fa fa-trash" aria-hidden="true"></i> Remove selected stickers
+        </button>
+
+
+        <input style="display:none;" type="file" id="imageLoader" @change="updateCanvasImage"/>
+      </div>
+      <div id="stickerList" v-show="showStickers">
+        <img @click="addSticker(sticker)" v-for="sticker in stickers" :src="sticker">
+      </div>
+      <div id="finalImageContainer" v-if="finalImage">
+        <img :src="finalImage">
+        <button id="close" @click="closeFinalImage" class="btn btn-danger">x</button>
+      </div>
+    </div>
+  </template>
+
+  <script>
+    import {fabric} from 'fabric-with-gestures';
+    import {saver} from 'file-saver/FileSaver';
+  export default {
+    name: 'Blocker',
+    data () {
+      return {
+        msg: 'Welcome to Your Vue.js App',
+        canvas:null,
+        stickers: [
+          require('../assets/stickers/penguin_birthday.svg'),
+          require('../assets/stickers/penguin_bowtie.svg'),
+          require('../assets/stickers/penguin_crown.svg'),
+          require('../assets/stickers/penguin_fancy.svg'),
+          require('../assets/stickers/penguin_hat.svg'),
+          require('../assets/stickers/penguin_winter.svg')
+        ],
+        selection: false,
+        showStickers: false,
+        finalImage:null,
+        scale:1,
+        imageWidth:1,
+        imageHeight:1
+
+      }
+    },
+    methods: {
+
+      updateCanvasImage(e){
+        var self = this;
+
+        var reader, files = e.target.files;
+
+        var reader = new FileReader();
+
+        reader.onload = (e) => {
+          var img = new Image();
+          img.onload = ()=> {
+            let c = this.canvas;
+            let fImg = new fabric.Image(img);
+
+            let original_width = img.width;
+            let original_height = img.height;
+            let bound_width = c.width;
+            let bound_height = c.height;
+            let new_width = original_width;
+            let new_height = original_height;
+
+            if (original_width > bound_width) {
+              //scale width to fit
+              new_width = bound_width;
+              //scale height to maintain aspect ratio
+              new_height = (new_width * original_height) / original_width;
+              this.scale = new_height / original_height;
+            }
+
+            if (new_height > bound_height) {
+              //scale height to fit instead
+              new_height = bound_height;
+              //scale width to maintain aspect ratio
+              new_width = (new_height * original_width) / original_height;
+
+              this.scale = new_width / original_width;
+            }
+
+            // console.log(original_width/new_width);
+            // console.log(original_height/new_height);
+            //
+            // console.log(img.width, new_width);
+            this.imageWidth = new_width;
+            this.imageHeight = new_height;
+            c.setBackgroundImage(fImg, c.renderAll.bind(c),{
+              originX: 'center',
+              originY: 'center',
+              left: c.width/2,
+              top: c.height/2,
+              scaleX: new_width / img.width,
+              scaleY: new_height / img.height
+            });
+          }
+          img.src = event.target.result;
+        };
+        reader.readAsDataURL(files[0]);
+      },
+
+      clearControls(){
+        this.showStickers = false;
+      },
+
+      removeItem(e){
+        e.preventDefault();
+        let c = this.canvas;
+        c.getActiveObjects().forEach((o)=>{
+          c.remove(o);
+        })
+        c.discardActiveObject();
+
+
+      },
+      saveImage(){
+        let c = this.canvas;
+        this.finalImage = c.toDataURL({
+          format: 'jpeg',
+          quality: 0.8,
+          multiplier: 1/this.scale,
+          width: this.imageWidth,
+          height: this.imageHeight,
+          left: (c.width - this.imageWidth)/2,
+          top: (c.height - this.imageHeight)/2
+        })
+        // c.getElement().toBlob((blob)=>{
+        //   var urlCreator = window.URL || window.webkitURL;
+        //   this.finalImage = urlCreator.createObjectURL(blob);
+        //
+        // })
+      },
+      closeFinalImage(){
+        this.finalImage = null
+      },
+      addSticker(sticker){
+        let c = this.canvas;
+        fabric.loadSVGFromURL(sticker, function(objects, options){
+         let obj = fabric.util.groupSVGElements(objects, options);
+         obj.scaleToWidth(50);
+
+         c.add(obj).renderAll();
+        })
+      },
+      selectionSet(){
+        this.selection = true;
+      },
+      selectionCleared(){
+        this.selection = false;
+      },
+      sizeTools(){
+        let c = this.canvas;
+        c.setWidth(window.innerWidth);
+        c.setHeight(window.innerHeight - document.getElementById('controls').clientHeight);
+        document.getElementById('stickerList').style.left = document.getElementById('stickerButton').offsetLeft+"px";
+        document.getElementById('stickerList').style.bottom = (document.getElementById('controls').clientHeight - 10)+"px";
+      }
+    },
+    mounted(){
+      this.canvas = new fabric.Canvas('imageCanvas', {
+        selectionLineWidth: 2
+      });
+      this.sizeTools();
+    let c = this.canvas;
+    c.on({
+      'selection:created':this.selectionSet,
+      'selection:updated':this.selectionSet,
+      'selection:cleared':this.selectionCleared,
+      'mouse:down':this.clearControls,
+      'touch:gesture': function(e) {
+        if (e.e.touches && e.e.touches.length == 2) {
+          pausePanning = true;
+          var point = new fabric.Point(e.self.x, e.self.y);
+          if (e.self.state == "start") {
+            zoomStartScale = canvas.getZoom();
+          }
+          var delta = zoomStartScale * e.self.scale;
+          canvas.zoomToPoint(point, delta);
+          pausePanning = false;
+        }
+      },
+      'object:selected': function() {
+        pausePanning = true;
+      },
+      'selection:cleared': function() {
+        pausePanning = false;
+      },
+      'touch:drag': function(e) {
+        if (pausePanning == false && undefined != e.self.x && undefined != e.self.x) {
+          currentX = e.self.x;
+          currentY = e.self.y;
+          xChange = currentX - lastX;
+          yChange = currentY - lastY;
+
+          if( (Math.abs(currentX - lastX) <= 50) && (Math.abs(currentY - lastY) <= 50)) {
+            var delta = new fabric.Point(xChange, yChange);
+            canvas.relativePan(delta);
+          }
+
+          lastX = e.self.x;
+          lastY = e.self.y;
+        }
+      }
+    })
+    },
+    created(){
+      window.addEventListener('resize',this.sizeTools);
+    },
+    destroyed(){
+      window.removeEventListener('resize',this.sizeTools);
+    }
+  }
+  </script>
+
+  <!-- Add "scoped" attribute to limit CSS to this component only -->
+  <style scoped>
+    canvas{
+      border-style:solid;
+      border-width:1px;
+      width:500px;
+    }
+    #controls{
+      padding:10px;
+      background-color:black;
+      text-align:center;
+    }
+    #stickerList{
+      background-color:white;
+      width:210px;
+      height:300px;
+      border-style:solid;
+      border-width:1px;
+      text-align:left;
+      position:absolute;
+      bottom:0;
+      overflow-y:auto;
+    }
+    #stickerList img{
+      width:50px;
+      padding:5px;
+    }
+    #finalImageContainer{
+      position:absolute;
+      top:0;
+      left:0;
+      right:0;
+      bottom:0;
+      background-color:black;
+    }
+
+    #finalImageContainer img{
+      max-width:100%;
+      max-height:100%;
+
+    }
+    #close{
+      position:absolute;
+      top:5px;
+      right:5px;
+    }
+
+  </style>
