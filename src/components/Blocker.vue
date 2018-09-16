@@ -11,11 +11,12 @@
         </label>
 
         <button class="btn btn-success" :disabled="!image" @click="saveImage"><i class="fa fa-save"></i> Save image</button>
-        <button @click="showStickers = !showStickers" id="stickerButton" class="btn btn-info">
-         <i class="fa fa-plus" aria-hidden="true"></i> Add sticker
+        <button @click="showStickers = !showStickers" :disabled="!image" id="stickerButton" class="btn btn-info">
+         <i class="fa fa-smile-o" aria-hidden="true"></i> Stickers
         </button>
         <button class="btn btn-danger" :disabled="!selection" @click="removeItem"><i class="fa fa-trash" aria-hidden="true"></i> Remove selected stickers
         </button>
+        <button class="btn btn-warning" @click="removeAll" :disabled="stickerCount == 0"><i class="fa fa-refresh" aria-hidden="true"></i> Remove all stickers</button>
 
 
 
@@ -56,6 +57,16 @@
         imageHeight:1,
         image: null
 
+      }
+    },
+    computed:{
+      stickerCount(){
+        let c = this.canvas;
+        if(c){
+          return c.getObjects().length;
+        }
+
+        return 0;
       }
     },
     methods: {
@@ -119,10 +130,6 @@
             this.scale = new_width / original_width;
           }
 
-          // console.log(original_width/new_width);
-          // console.log(original_height/new_height);
-          //
-          // console.log(img.width, new_width);
           this.imageWidth = new_width;
           this.imageHeight = new_height;
           c.setBackgroundImage(fImg, c.renderAll.bind(c),{
@@ -181,6 +188,17 @@
 
 
         })
+      },
+      removeAll(e){
+        if(confirm('Are you sure? This cannot be undone')){
+          let c = this.canvas;
+          let stickers = c.getObjects();
+          stickers.forEach((sticker)=>{
+
+            c.remove(sticker);
+          });
+          c.renderAll();
+        }
       },
       selectionSet(){
         this.selection = true;
