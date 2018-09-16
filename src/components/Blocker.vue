@@ -1,12 +1,16 @@
   <template>
     <div class="hello">
+      <div v-if="!image" id="noImage">
+        Click "New image" below to get started.
+      </div>
       <canvas id="imageCanvas" ref="imageCanvas"></canvas>
       <div id="controls">
         <label for="imageLoader">
-          <span class="btn btn-primary"><i class="fa fa-image"></i> Upload image</span>
+          <span class="btn btn-primary" @click="confirmNewImage"><i class="fa fa-image"></i> New image</span>
+          <input style="display:none;" type="file" id="imageLoader" @change="updateCanvasImage"/>
         </label>
 
-        <button class="btn btn-success" @click="saveImage"><i class="fa fa-save"></i> Save image</button>
+        <button class="btn btn-success" :disabled="!image" @click="saveImage"><i class="fa fa-save"></i> Save image</button>
         <button @click="showStickers = !showStickers" id="stickerButton" class="btn btn-info">
          <i class="fa fa-plus" aria-hidden="true"></i> Add sticker
         </button>
@@ -14,7 +18,7 @@
         </button>
 
 
-        <input style="display:none;" type="file" id="imageLoader" @change="updateCanvasImage"/>
+
       </div>
       <div id="stickerList" v-show="showStickers">
         <img @click="addSticker(sticker)" v-for="sticker in stickers" :src="sticker">
@@ -29,6 +33,7 @@
   <script>
     import {fabric} from 'fabric-with-gestures';
     import {saver} from 'file-saver/FileSaver';
+    const resetSizeEvents = ['resize','orientationchange'];
   export default {
     name: 'Blocker',
     data () {
@@ -55,23 +60,29 @@
     },
     methods: {
 
+      confirmNewImage(e){
+        if(this.image && !confirm('Are you sure you wish to add a new image? This will erase your current one')) {
+          e.preventDefault();
+        }
+      },
+
       updateCanvasImage(e){
-        var self = this;
+          let files = e.target.files;
 
-        var reader, files = e.target.files;
+          let reader = new FileReader();
 
-        var reader = new FileReader();
+          reader.onload = (e) => {
+            let img = new Image();
 
-        reader.onload = (e) => {
-          let img = new Image();
+            img.onload = ()=> {
+              this.image = img;
+              this.setBackgroundImage();
+            }
+            img.src = event.target.result;
+          };
+          reader.readAsDataURL(files[0]);
 
-          img.onload = ()=> {
-            this.image = img;
-            this.setBackgroundImage();
-          }
-          img.src = event.target.result;
-        };
-        reader.readAsDataURL(files[0]);
+
       },
 
       clearControls(){
@@ -203,10 +214,15 @@
     })
     },
     created(){
-      window.addEventListener('resize',this.resetSize);
+      resetSizeEvents.forEach((e)=>{
+        window.addEventListener(e,this.resetSize);
+      });
+
     },
     destroyed(){
-      window.removeEventListener('resize',this.resetSize);
+      resetSizeEvents.forEach((e)=>{
+        window.removeEventListener(e,this.resetSize);
+      });
     }
   }
   </script>
@@ -256,6 +272,16 @@
       position:absolute;
       top:5px;
       right:5px;
+    }
+
+    #noImage{
+      position:absolute;
+      top:33%;
+      left:0;
+      right:0;
+      padding:0 10%;
+      font-size:2em;
+      text-align:center;
     }
 
   </style>
