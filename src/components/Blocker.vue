@@ -48,7 +48,8 @@
         finalImage:null,
         scale:1,
         imageWidth:1,
-        imageHeight:1
+        imageHeight:1,
+        image: null
 
       }
     },
@@ -62,49 +63,11 @@
         var reader = new FileReader();
 
         reader.onload = (e) => {
-          var img = new Image();
+          let img = new Image();
+
           img.onload = ()=> {
-            let c = this.canvas;
-            let fImg = new fabric.Image(img);
-
-            let original_width = img.width;
-            let original_height = img.height;
-            let bound_width = c.width;
-            let bound_height = c.height;
-            let new_width = original_width;
-            let new_height = original_height;
-
-            if (original_width > bound_width) {
-              //scale width to fit
-              new_width = bound_width;
-              //scale height to maintain aspect ratio
-              new_height = (new_width * original_height) / original_width;
-              this.scale = new_height / original_height;
-            }
-
-            if (new_height > bound_height) {
-              //scale height to fit instead
-              new_height = bound_height;
-              //scale width to maintain aspect ratio
-              new_width = (new_height * original_width) / original_height;
-
-              this.scale = new_width / original_width;
-            }
-
-            // console.log(original_width/new_width);
-            // console.log(original_height/new_height);
-            //
-            // console.log(img.width, new_width);
-            this.imageWidth = new_width;
-            this.imageHeight = new_height;
-            c.setBackgroundImage(fImg, c.renderAll.bind(c),{
-              originX: 'center',
-              originY: 'center',
-              left: c.width/2,
-              top: c.height/2,
-              scaleX: new_width / img.width,
-              scaleY: new_height / img.height
-            });
+            this.image = img;
+            this.setBackgroundImage();
           }
           img.src = event.target.result;
         };
@@ -113,6 +76,54 @@
 
       clearControls(){
         this.showStickers = false;
+      },
+
+      setBackgroundImage(){
+        let img = this.image;
+        if(img){
+          let c = this.canvas;
+          let fImg = new fabric.Image(img);
+
+          let original_width = img.width;
+          let original_height = img.height;
+          let bound_width = c.width;
+          let bound_height = c.height;
+          let new_width = original_width;
+          let new_height = original_height;
+
+          if (original_width > bound_width) {
+            //scale width to fit
+            new_width = bound_width;
+            //scale height to maintain aspect ratio
+            new_height = (new_width * original_height) / original_width;
+            this.scale = new_height / original_height;
+          }
+
+          if (new_height > bound_height) {
+            //scale height to fit instead
+            new_height = bound_height;
+            //scale width to maintain aspect ratio
+            new_width = (new_height * original_width) / original_height;
+
+            this.scale = new_width / original_width;
+          }
+
+          // console.log(original_width/new_width);
+          // console.log(original_height/new_height);
+          //
+          // console.log(img.width, new_width);
+          this.imageWidth = new_width;
+          this.imageHeight = new_height;
+          c.setBackgroundImage(fImg, c.renderAll.bind(c),{
+            originX: 'center',
+            originY: 'center',
+            left: c.width/2,
+            top: c.height/2,
+            scaleX: new_width / img.width,
+            scaleY: new_height / img.height
+          });
+        }
+
       },
 
       removeItem(e){
@@ -166,19 +177,22 @@
       selectionCleared(){
         this.selection = false;
       },
-      sizeTools(){
+      resetSize() {
         let c = this.canvas;
         c.setWidth(window.innerWidth);
         c.setHeight(window.innerHeight - document.getElementById('controls').clientHeight);
-        document.getElementById('stickerList').style.left = document.getElementById('stickerButton').offsetLeft+"px";
-        document.getElementById('stickerList').style.bottom = (document.getElementById('controls').clientHeight - 10)+"px";
-      }
+        document.getElementById('stickerList').style.left = document.getElementById('stickerButton').offsetLeft + "px";
+        document.getElementById('stickerList').style.bottom = (document.getElementById('controls').clientHeight - 10) + "px";
+
+        this.setBackgroundImage();
+      },
+
     },
     mounted(){
       this.canvas = new fabric.Canvas('imageCanvas', {
         selectionLineWidth: 2
       });
-      this.sizeTools();
+      this.resetSize();
     let c = this.canvas;
     c.on({
       'selection:created':this.selectionSet,
@@ -189,10 +203,10 @@
     })
     },
     created(){
-      window.addEventListener('resize',this.sizeTools);
+      window.addEventListener('resize',this.resetSize);
     },
     destroyed(){
-      window.removeEventListener('resize',this.sizeTools);
+      window.removeEventListener('resize',this.resetSize);
     }
   }
   </script>
