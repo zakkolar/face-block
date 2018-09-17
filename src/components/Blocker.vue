@@ -16,7 +16,7 @@
         </button>
         <button class="btn btn-danger" :disabled="!selection" @click="removeItem"><i class="fa fa-trash" aria-hidden="true"></i> Remove selected stickers
         </button>
-        <button class="btn btn-warning" @click="removeAll" :disabled="stickerCount == 0"><i class="fa fa-refresh" aria-hidden="true"></i> Remove all stickers</button>
+        <button class="btn btn-warning" @click="confirmBefore(removeAll, 'Are you sure? This cannot be undone')" :disabled="stickerCount == 0"><i class="fa fa-refresh" aria-hidden="true"></i> Remove all stickers</button>
 
 
 
@@ -87,6 +87,7 @@
 
             img.onload = ()=> {
               this.image = img;
+              this.removeAll();
               this.setBackgroundImage();
             }
             img.src = event.target.result;
@@ -189,8 +190,16 @@
 
         })
       },
-      removeAll(e){
-        if(confirm('Are you sure? This cannot be undone')){
+      confirmBefore(fn, message="Are you sure?", onlyIfImage=false){
+
+          if((onlyIfImage && !this.image) || confirm(message)){
+            fn();
+          }
+
+
+      },
+      removeAll(){
+
           let c = this.canvas;
           let stickers = c.getObjects();
           stickers.forEach((sticker)=>{
@@ -198,7 +207,7 @@
             c.remove(sticker);
           });
           c.renderAll();
-        }
+
       },
       selectionSet(){
         this.selection = true;
