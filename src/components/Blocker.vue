@@ -452,6 +452,10 @@
       position:absolute;
       bottom:0;
       overflow-y:auto;
+      -webkit-user-select: none;  /* Chrome all / Safari all */
+      -moz-user-select: none;     /* Firefox all */
+      -ms-user-select: none;      /* IE 10+ */
+      user-select: none;          /* Likely future */
     }
     #stickerList img{
       width:50px;
