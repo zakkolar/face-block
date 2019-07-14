@@ -14,9 +14,11 @@
         <button @click="showStickers = !showStickers" :disabled="!image" id="stickerButton" class="btn btn-info">
          <i class="fa fa-smile-o" aria-hidden="true"></i> Stickers
         </button>
+        <button class="btn btn-default" :disabled="!image || detectingFaces" @click="autoCover">{{detectingFaces ? "Detecting faces..." : "Auto cover faces"}}</button>
         <button class="btn btn-danger" :disabled="!selection" @click="removeItem"><i class="fa fa-trash" aria-hidden="true"></i> Remove selected stickers
         </button>
         <button class="btn btn-warning" @click="confirmBefore(removeAll, 'Are you sure? This cannot be undone')" :disabled="stickerCount == 0"><i class="fa fa-refresh" aria-hidden="true"></i> Remove all stickers</button>
+
 
 
 
@@ -32,9 +34,33 @@
   </template>
 
   <script>
+    /*eslint no-console: "warn"*/
     import {fabric} from 'fabric-with-gestures';
+
+    import * as faceapi from 'face-api.js';
     const resetSizeEvents = ['resize','orientationchange'];
-  export default {
+
+    function shuffle(input) {
+      const array = input.slice(0);
+      var currentIndex = array.length, temporaryValue, randomIndex;
+
+      // While there remain elements to shuffle...
+      while (0 !== currentIndex) {
+
+        // Pick a remaining element...
+        randomIndex = Math.floor(Math.random() * currentIndex);
+        currentIndex -= 1;
+
+        // And swap it with the current element.
+        temporaryValue = array[currentIndex];
+        array[currentIndex] = array[randomIndex];
+        array[randomIndex] = temporaryValue;
+      }
+
+      return array;
+    }
+
+    export default {
     name: 'Blocker',
     data () {
       return {
@@ -54,7 +80,9 @@
         scale:1,
         imageWidth:1,
         imageHeight:1,
-        image: null
+        image: null,
+        faceModels: false,
+        detectingFaces: false
 
       }
     },
@@ -98,6 +126,71 @@
 
       clearControls(){
         this.showStickers = false;
+      },
+
+      async getModels(){
+
+        if(!this.faceModels){
+          await faceapi.loadTinyFaceDetectorModel('/models');
+
+          this.faceModels = true;
+        }
+
+        return this.faceModels;
+      },
+
+      async detectFaces(){
+        await this.getModels();
+        const image = this.image;
+        const detections = await faceapi.detectAllFaces(image, new faceapi.TinyFaceDetectorOptions({ inputSize: 480 }));
+        return detections;
+      },
+
+      getStickerChoices(){
+        return shuffle(this.stickers);
+      },
+
+      autoCover(){
+        this.detectingFaces = true;
+        this.detectFaces().then((detections)=>{
+          let stickers = this.getStickerChoices();
+          detections.forEach((detection)=>{
+            const box = detection.box;
+
+            const sticker = stickers.pop();
+
+            const c = this.canvas;
+
+            const centerX = c.width/2;
+            const centerY = c.height/2;
+
+            const faceScale = 1;
+
+            const imgLeft = centerX - (this.imageWidth/2);
+            const imgTop = centerY - (this.imageHeight/2);
+
+            const width = this.scale * box.width;
+            const height = this.scale * box.height;
+            const left = (this.scale * box.x) + (imgLeft);
+            const top = (this.scale * box.y) + (imgTop);
+
+            const paddedWidth = width * faceScale;
+            const paddedHeight = height * faceScale;
+            const paddedLeft = left - ((paddedWidth - width)/2);
+            const paddedTop = top - ((paddedHeight - height)/2);
+
+            // const left = imgLeft;
+            // const top = imgTop;
+
+            this.addSticker(sticker, {width: paddedWidth, left: paddedLeft, top: paddedTop});
+            if(stickers.length === 0){
+              stickers = this.getStickerChoices();
+            }
+          })
+          this.detectingFaces = false;
+        })
+
+
       },
 
       setBackgroundImage(){
@@ -156,7 +249,7 @@
       },
       saveImage(){
         let c = this.canvas;
-        this.finalImage = c.toDataURL({
+        let image = c.toDataURL({
           format: 'jpeg',
           quality: 0.8,
           multiplier: 1/this.scale,
@@ -165,20 +258,29 @@
           left: (c.width - this.imageWidth)/2,
           top: (c.height - this.imageHeight)/2
         })
-        // c.getElement().toBlob((blob)=>{
-        //   var urlCreator = window.URL || window.webkitURL;
-        //   this.finalImage = urlCreator.createObjectURL(blob);
-        //
-        // })
+
+        this.finalImage = image;
+
       },
       closeFinalImage(){
         this.finalImage = null
       },
-      addSticker(sticker){
+      addSticker(sticker, settings = {}){
+
         let c = this.canvas;
+
+        const defaultOptions = {
+          left: c.width/2,
+          top: c.height/2,
+          width: 50
+        }
+
+
+        settings = Object.assign(defaultOptions, settings);
+
         fabric.loadSVGFromURL(sticker, function(objects, options){
          let obj = fabric.util.groupSVGElements(objects, options);
-         obj.scaleToWidth(50).set({left: c.width/2, top: c.height/2}).setCoords();
+         obj.scaleToWidth(settings.width).set({left: settings.left, top: settings.top}).setCoords();
 
          c.add(obj).renderAll();
 
