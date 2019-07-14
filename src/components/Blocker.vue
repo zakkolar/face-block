@@ -22,7 +22,7 @@
 
       </div>
       <div id="stickerList" v-show="showStickers">
-        <img @click="addSticker(sticker)" v-for="sticker in stickers" :src="sticker">
+        <img v-bind:key="sticker" @click="addSticker(sticker)" v-for="sticker in stickers" :src="sticker">
       </div>
       <div id="finalImageContainer" v-if="finalImage">
         <img :src="finalImage">
@@ -33,7 +33,6 @@
 
   <script>
     import {fabric} from 'fabric-with-gestures';
-    import {saver} from 'file-saver/FileSaver';
     const resetSizeEvents = ['resize','orientationchange'];
   export default {
     name: 'Blocker',
@@ -82,7 +81,7 @@
 
           let reader = new FileReader();
 
-          reader.onload = (e) => {
+          reader.onload = () => {
             let img = new Image();
 
             img.onload = ()=> {

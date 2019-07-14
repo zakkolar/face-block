@@ -1,6 +1,7 @@
 import Vue from 'vue'
 import Router from 'vue-router'
-import Blocker from '@/components/Blocker'
+import Blocker from "../components/Blocker";
+
 
 Vue.use(Router)
 
