@@ -15,7 +15,7 @@
          <i class="fa fa-smile-o" aria-hidden="true"></i> Stickers
         </button>
         <button class="btn btn-default" :disabled="!image || detectingFaces" @click="autoCover">{{detectingFaces ? "Detecting faces..." : "Auto cover faces"}}</button>
-        <button class="btn btn-danger" :disabled="!selection" @click="removeItem"><i class="fa fa-trash" aria-hidden="true"></i> Remove selected stickers
+        <button class="btn btn-danger" :disabled="!selection" @click.prevent="removeItem"><i class="fa fa-trash" aria-hidden="true"></i> Remove selected stickers
         </button>
         <button class="btn btn-warning" @click="confirmBefore(removeAll, 'Are you sure? This cannot be undone')" :disabled="stickerCount == 0"><i class="fa fa-refresh" aria-hidden="true"></i> Remove all stickers</button>
 
@@ -38,7 +38,13 @@
     import {fabric} from 'fabric-with-gestures';
 
     import * as faceapi from 'face-api.js';
-    const resetSizeEvents = ['resize','orientationchange'];
+    // const resetSizeEvents = ['resize','orientationchange'];
+
+    const eventHandlers = {
+      'resize': ['resetSize'],
+      'orientationchange': ['resetSize'],
+      'keydown': ['keyHandler']
+    };
 
     function shuffle(input) {
       const array = input.slice(0);
@@ -237,8 +243,7 @@
 
       },
 
-      removeItem(e){
-        e.preventDefault();
+      removeItem(){
         let c = this.canvas;
         c.getActiveObjects().forEach((o)=>{
           c.remove(o);
@@ -291,12 +296,20 @@
 
         })
       },
+      selectAll(){
+        const c = this.canvas;
+        c.discardActiveObject();
+        const sel = new fabric.ActiveSelection(c.getObjects(), {
+          canvas: c,
+        });
+        c.setActiveObject(sel);
+        c.requestRenderAll();
+      },
       confirmBefore(fn, message="Are you sure?", onlyIfImage=false){
 
           if((onlyIfImage && !this.image) || confirm(message)){
             fn();
           }
-
 
       },
       removeAll(){
@@ -326,6 +339,50 @@
         this.setBackgroundImage();
       },
 
+      moveSelection(direction, step){
+        const canvas = this.canvas;
+        const activeObject = canvas.getActiveObject();
+
+        if (activeObject) {
+          switch (direction) {
+            case 'left':
+              activeObject.left -= step;
+              break;
+            case 'up':
+              activeObject.top -= step;
+              break;
+            case 'right':
+              activeObject.left += step;
+              break;
+            case 'down':
+              activeObject.top += step;
+              break;
+          }
+          activeObject.setCoords();
+          canvas.renderAll();
+        }
+      },
+
+      keyHandler(e){
+        console.log(e.key);
+        if(e.key === 'Delete' || e.key === 'Backspace'){
+          this.removeItem();
+        }
+        if(e.key === 'a' && (e.getModifierState('Meta') || e.getModifierState('Control'))){
+          this.selectAll();
+        }
+
+
+        if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].indexOf(e.key) > -1){
+          let step = 5;
+          if(e.getModifierState('Shift')){
+            step = 1;
+          }
+          this.moveSelection(e.key.toLowerCase().replace('arrow',''), step);
+        }
+
+      }
+
     },
     mounted(){
       this.canvas = new fabric.Canvas('imageCanvas', {
@@ -342,15 +399,33 @@
     })
     },
     created(){
-      resetSizeEvents.forEach((e)=>{
-        window.addEventListener(e,this.resetSize);
-      });
+      // resetSizeEvents.forEach((e)=>{
+      //   window.addEventListener(e,this.resetSize);
+      // });
+      const eventEntries = Object.entries(eventHandlers);
+      for(const [event, handlers] of eventEntries){
+        handlers.forEach((handler)=>{
+          if(this.hasOwnProperty(handler)){
+            window.addEventListener(event, this[handler]);
+          }
+
+        })
+      }
 
     },
     destroyed(){
-      resetSizeEvents.forEach((e)=>{
-        window.removeEventListener(e,this.resetSize);
-      });
+      // resetSizeEvents.forEach((e)=>{
+      //   window.removeEventListener(e,this.resetSize);
+      // });
+      const eventEntries = Object.entries(eventHandlers);
+      for(const [event, handlers] of eventEntries){
+        handlers.forEach((handler)=>{
+          if(this.hasOwnProperty(handler)){
+            window.removeEventListener(event, this[handler]);
+          }
+
+        })
+      }
     }
   }
   </script>
