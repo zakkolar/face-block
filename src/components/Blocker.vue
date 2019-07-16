@@ -113,11 +113,18 @@
       confirmNewImage(e){
         if(this.image && !confirm('Are you sure you wish to add a new image? This will erase your current one')) {
           e.preventDefault();
+        }
+        else if(this.image){
           this.clearImage();
         }
       },
       clearImage(){
         this.image = null;
+        this.removeAll();
+
+        const c = this.canvas;
+        c.backgroundImage = false;
+        c.renderAll();
       },
       updateCanvasImage(e){
           let files = e.target.files;
