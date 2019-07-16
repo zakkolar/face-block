@@ -14,7 +14,7 @@
         <button @click="showStickers = !showStickers" :disabled="!image" id="stickerButton" class="btn btn-info">
          <i class="fa fa-smile-o" aria-hidden="true"></i> Stickers
         </button>
-        <button class="btn btn-default" :disabled="!image || detectingFaces" @click="autoCover">{{detectingFaces ? "Detecting faces..." : "Auto cover faces"}}</button>
+        <button class="btn btn-secondary" :disabled="!image || detectingFaces" @click="autoCover">{{detectingFaces ? "Detecting faces..." : "Auto cover faces"}}</button>
         <button class="btn btn-danger" :disabled="!selection" @click.prevent="removeItem"><i class="fa fa-trash" aria-hidden="true"></i> Remove selected stickers
         </button>
         <button class="btn btn-warning" @click="confirmBefore(removeAll, 'Are you sure? This cannot be undone')" :disabled="stickerCount == 0"><i class="fa fa-refresh" aria-hidden="true"></i> Remove all stickers</button>
@@ -34,10 +34,16 @@
   </template>
 
   <script>
-    /*eslint no-console: "warn"*/
+    /* eslint-disable */
     import {fabric} from 'fabric-with-gestures';
 
+    console.log('new test');
+
     import * as faceapi from 'face-api.js';
+
+    window.faceapi = faceapi;
+
+
     // const resetSizeEvents = ['resize','orientationchange'];
 
     const eventHandlers = {
@@ -45,6 +51,9 @@
       'orientationchange': ['resetSize'],
       'keydown': ['keyHandler']
     };
+
+
+
 
     function shuffle(input) {
       const array = input.slice(0);
@@ -66,7 +75,7 @@
       return array;
     }
 
-    export default {
+   export default {
     name: 'Blocker',
     data () {
       return {
@@ -87,7 +96,6 @@
         imageWidth:1,
         imageHeight:1,
         image: null,
-        faceModels: false,
         detectingFaces: false
 
       }
@@ -120,6 +128,7 @@
 
             img.onload = ()=> {
               this.image = img;
+
               this.removeAll();
               this.setBackgroundImage();
             }
@@ -134,31 +143,39 @@
         this.showStickers = false;
       },
 
-      async getModels(){
-
-        if(!this.faceModels){
-          await faceapi.loadTinyFaceDetectorModel('/models');
-
-          this.faceModels = true;
+      async detectFaces() {
+        if (!this.isFaceDetectionModelLoaded()) {
+          await this.getFaceDetectionNet().load('/models')
         }
 
-        return this.faceModels;
+        const options = this.getFaceDetectorOptions()
+        const results = await faceapi.detectAllFaces(this.image, options)
+        return results;
+
+
       },
 
-      async detectFaces(){
-        await this.getModels();
-        const image = this.image;
-        const detections = await faceapi.detectAllFaces(image, new faceapi.TinyFaceDetectorOptions({ inputSize: 480 }));
-        return detections;
-      },
+      getFaceDetectionNet() {
+      return faceapi.nets.tinyFaceDetector
+    },
 
+     isFaceDetectionModelLoaded() {
+      return !!this.getFaceDetectionNet().params
+    },
+
+     getFaceDetectorOptions() {
+      const inputSize = 32*15;
+      return new faceapi.TinyFaceDetectorOptions({ inputSize });
+    },
       getStickerChoices(){
         return shuffle(this.stickers);
       },
 
       autoCover(){
+
         this.detectingFaces = true;
         this.detectFaces().then((detections)=>{
+
           let stickers = this.getStickerChoices();
           detections.forEach((detection)=>{
             const box = detection.box;
@@ -192,10 +209,10 @@
             if(stickers.length === 0){
               stickers = this.getStickerChoices();
             }
+            this.detectingFaces = false;
           })
-          this.detectingFaces = false;
-        })
 
+        });
 
       },
 
@@ -238,6 +255,7 @@
             top: c.height/2,
             scaleX: new_width / img.width,
             scaleY: new_height / img.height
+
           });
         }
 
@@ -364,7 +382,6 @@
       },
 
       keyHandler(e){
-        console.log(e.key);
         if(e.key === 'Delete' || e.key === 'Backspace'){
           this.removeItem();
         }
@@ -428,6 +445,7 @@
       }
     }
   }
+
   </script>
 
   <!-- Add "scoped" attribute to limit CSS to this component only -->
@@ -489,6 +507,10 @@
       padding:0 10%;
       font-size:2em;
       text-align:center;
+      -webkit-user-select: none;  /* Chrome all / Safari all */
+      -moz-user-select: none;     /* Firefox all */
+      -ms-user-select: none;      /* IE 10+ */
+      user-select: none;          /* Likely future */
     }
 
   </style>
