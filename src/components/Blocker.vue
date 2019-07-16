@@ -24,7 +24,7 @@
 
       </div>
       <div id="stickerList" v-show="showStickers">
-        <img v-bind:key="sticker" @click="addSticker(sticker)" v-for="sticker in stickers" :src="sticker">
+        <img v-bind:key="sticker.image" @click="addSticker(sticker)" v-for="sticker in stickers" :src="sticker.image">
       </div>
       <div id="finalImageContainer" v-if="finalImage">
         <img :src="finalImage">
@@ -38,6 +38,7 @@
     import {fabric} from 'fabric-with-gestures';
 
     import * as faceapi from 'face-api.js';
+    import stickers from "../stickers";
 
     window.faceapi = faceapi;
 
@@ -79,14 +80,7 @@
       return {
         msg: 'Welcome to Your Vue.js App',
         canvas:null,
-        stickers: [
-          require('../assets/stickers/penguin_birthday.svg'),
-          require('../assets/stickers/penguin_bowtie.svg'),
-          require('../assets/stickers/penguin_crown.svg'),
-          require('../assets/stickers/penguin_fancy.svg'),
-          require('../assets/stickers/penguin_hat.svg'),
-          require('../assets/stickers/penguin_winter.svg')
-        ],
+        stickers: stickers,
         selection: false,
         showStickers: false,
         finalImage:null,
@@ -213,7 +207,7 @@
             // const left = imgLeft;
             // const top = imgTop;
 
-            this.addSticker(sticker, {width: paddedWidth, left: paddedLeft, top: paddedTop});
+            this.addSticker(sticker, {height: paddedHeight, width: paddedWidth, left: paddedLeft, top: paddedTop});
             if(stickers.length === 0){
               stickers = this.getStickerChoices();
             }
@@ -308,15 +302,26 @@
         const defaultOptions = {
           left: c.width/2,
           top: c.height/2,
-          width: 50
+          width: 50,
+          height: 50
         }
 
 
         settings = Object.assign(defaultOptions, settings);
 
-        fabric.loadSVGFromURL(sticker, function(objects, options){
+        fabric.loadSVGFromURL(sticker.image, function(objects, options){
          let obj = fabric.util.groupSVGElements(objects, options);
-         obj.scaleToWidth(settings.width).set({left: settings.left, top: settings.top}).setCoords();
+         // if(settings.width>settings.height){
+          //   obj.scaleToHeight(settings.height).set({left: settings.left, top: settings.top}).setCoords();
+          // }
+          // else{
+          //   obj.scaleToWidth(settings.width).set({left: settings.left, top: settings.top}).setCoords();
+          // }
+
+
+          const stickerPlacement = sticker.scaleToCoverFace(settings.left, settings.top, settings.width, settings.height);
+          obj.set({left: stickerPlacement.left, top: stickerPlacement.top, scaleX: stickerPlacement.scale, scaleY: stickerPlacement.scale}).setCoords();
+
 
          c.add(obj).renderAll();
 
