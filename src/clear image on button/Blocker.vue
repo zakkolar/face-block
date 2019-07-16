@@ -115,6 +115,7 @@
       confirmNewImage(e){
         if(this.image && !confirm('Are you sure you wish to add a new image? This will erase your current one')) {
           e.preventDefault();
+          this.image = null;
         }
       },
 
