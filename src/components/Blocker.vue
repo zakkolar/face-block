@@ -165,7 +165,7 @@
     },
 
      getFaceDetectorOptions() {
-      const inputSize = 32*15;
+      const inputSize = 32*42;
       return new faceapi.TinyFaceDetectorOptions({ inputSize });
     },
       getStickerChoices(){
