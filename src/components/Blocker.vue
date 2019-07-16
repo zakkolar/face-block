@@ -209,9 +209,14 @@
             if(stickers.length === 0){
               stickers = this.getStickerChoices();
             }
-            this.detectingFaces = false;
+
           })
 
+          this.detectingFaces = false;
+
+        }, function(e){
+          console.log(e);
+          this.detectingFaces = false;
         });
 
       },
