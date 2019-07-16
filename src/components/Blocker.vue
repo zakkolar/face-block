@@ -37,8 +37,6 @@
     /* eslint-disable */
     import {fabric} from 'fabric-with-gestures';
 
-    console.log('new test');
-
     import * as faceapi from 'face-api.js';
 
     window.faceapi = faceapi;
@@ -115,10 +113,12 @@
       confirmNewImage(e){
         if(this.image && !confirm('Are you sure you wish to add a new image? This will erase your current one')) {
           e.preventDefault();
-          this.image = null;
+          this.clearImage();
         }
       },
-
+      clearImage(){
+        this.image = null;
+      },
       updateCanvasImage(e){
           let files = e.target.files;
 
@@ -165,7 +165,7 @@
     },
 
      getFaceDetectorOptions() {
-      const inputSize = 32*42;
+      const inputSize = 32*32;
       return new faceapi.TinyFaceDetectorOptions({ inputSize });
     },
       getStickerChoices(){
