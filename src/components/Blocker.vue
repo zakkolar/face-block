@@ -17,8 +17,9 @@
         <button class="btn btn-secondary" :disabled="!image || detectingFaces" @click="autoCover">{{detectingFaces ? "Detecting faces..." : "Auto cover faces"}}</button>
         <button class="btn btn-danger" :disabled="!selection" @click.prevent="removeItem"><i class="fa fa-trash" aria-hidden="true"></i> Remove selected stickers
         </button>
-        <button class="btn btn-warning" @click="confirmBefore(removeAll, 'Are you sure? This cannot be undone')" :disabled="stickerCount == 0"><i class="fa fa-refresh" aria-hidden="true"></i> Remove all stickers</button>
-
+        <button class="btn btn-warning" @click="removeAll" :disabled="stickerCount == 0"><i class="fa fa-refresh" aria-hidden="true"></i> Remove all stickers</button>
+        <button class="btn btn-light" :disabled="loadingHistory || undoStack.length===0" @click="undo">Undo</button>
+        <button class="btn btn-light" :disabled="loadingHistory || redoStack.length===0" @click="redo">Redo</button>
 
 
 
@@ -50,7 +51,6 @@
       'orientationchange': ['resetSize'],
       'keydown': ['keyHandler']
     };
-
 
 
 
@@ -88,7 +88,12 @@
         imageWidth:1,
         imageHeight:1,
         image: null,
-        detectingFaces: false
+        detectingFaces: false,
+        pauseSaving: false,
+        undoStack: [],
+        redoStack: [],
+        currentState: null,
+        loadingHistory: false,
 
       }
     },
@@ -115,7 +120,6 @@
       clearImage(){
         this.image = null;
         this.removeAll();
-
         const c = this.canvas;
         c.backgroundImage = false;
         c.renderAll();
@@ -133,6 +137,7 @@
 
               this.removeAll();
               this.setBackgroundImage();
+              this.clearHistory();
             }
             img.src = event.target.result;
           };
@@ -143,6 +148,12 @@
 
       clearControls(){
         this.showStickers = false;
+      },
+
+      clearHistory(){
+        this.currentState = null;
+        this.undoStack.length = 0;
+        this.redoStack.legnth = 0;
       },
 
       async detectFaces() {
@@ -173,53 +184,68 @@
         return shuffle(this.stickers);
       },
 
+      withoutSaving(cb, saveAtEnd = true){
+        this.pauseSaving = true;
+        new Promise((resolve, reject)=>{
+          cb(resolve, reject);
+        }).then(()=>{
+          this.pauseSaving = false;
+          if(saveAtEnd){
+            this.saveState();
+          }
+        }).catch((e)=>{
+          console.log(e);
+          this.pauseSaving = false;
+        });
+
+
+      },
+
       autoCover(){
 
-        this.detectingFaces = true;
-        this.detectFaces().then((detections)=>{
 
-          let stickers = this.getStickerChoices();
-          detections.forEach((detection)=>{
-            const box = detection.box;
+        this.withoutSaving(async (resumeSaving, error)=>{
+          this.detectingFaces = true;
+          const detections = await this.detectFaces();
 
-            const sticker = stickers.pop();
+            let stickers = this.getStickerChoices();
+            for(let i=0; i<detections.length; i++) {
+              const detection = detections[i];
 
-            const c = this.canvas;
+              const box = detection.box;
 
-            const centerX = c.width/2;
-            const centerY = c.height/2;
+              const sticker = stickers.pop();
 
-            const faceScale = 1;
+              const c = this.canvas;
 
-            const imgLeft = centerX - (this.imageWidth/2);
-            const imgTop = centerY - (this.imageHeight/2);
+              const centerX = c.width / 2;
+              const centerY = c.height / 2;
 
-            const width = this.scale * box.width;
-            const height = this.scale * box.height;
-            const left = (this.scale * box.x) + (imgLeft);
-            const top = (this.scale * box.y) + (imgTop);
+              const imgLeft = centerX - (this.imageWidth / 2);
+              const imgTop = centerY - (this.imageHeight / 2);
 
-            const paddedWidth = width * faceScale;
-            const paddedHeight = height * faceScale;
-            const paddedLeft = left - ((paddedWidth - width)/2);
-            const paddedTop = top - ((paddedHeight - height)/2);
+              const width = this.scale * box.width;
+              const height = this.scale * box.height;
+              const left = (this.scale * box.x) + (imgLeft);
+              const top = (this.scale * box.y) + (imgTop);
 
-            // const left = imgLeft;
-            // const top = imgTop;
 
-            this.addSticker(sticker, {height: paddedHeight, width: paddedWidth, left: paddedLeft, top: paddedTop});
-            if(stickers.length === 0){
-              stickers = this.getStickerChoices();
+
+              await this.addStickerAsync(sticker, {
+                height: height,
+                width: width,
+                left: left,
+                top: top
+              });
+              if (stickers.length === 0) {
+                stickers = this.getStickerChoices();
+              }
             }
+            this.detectingFaces = false;
+            resumeSaving();
 
-          })
-
-          this.detectingFaces = false;
-
-        }, function(e){
-          console.log(e);
-          this.detectingFaces = false;
         });
+
 
       },
 
@@ -228,7 +254,6 @@
         if(img){
           let c = this.canvas;
           let fImg = new fabric.Image(img);
-
           let original_width = img.width;
           let original_height = img.height;
           let bound_width = c.width;
@@ -255,6 +280,9 @@
 
           this.imageWidth = new_width;
           this.imageHeight = new_height;
+
+
+
           c.setBackgroundImage(fImg, c.renderAll.bind(c),{
             originX: 'center',
             originY: 'center',
@@ -264,16 +292,21 @@
             scaleY: new_height / img.height
 
           });
+
         }
 
       },
 
       removeItem(){
-        let c = this.canvas;
-        c.getActiveObjects().forEach((o)=>{
-          c.remove(o);
+        this.withoutSaving((resumeSaving)=>{
+          let c = this.canvas;
+          c.getActiveObjects().forEach((o)=>{
+            c.remove(o);
+          })
+          c.discardActiveObject();
+          resumeSaving();
         })
-        c.discardActiveObject();
+
 
 
       },
@@ -295,7 +328,65 @@
       closeFinalImage(){
         this.finalImage = null
       },
-      addSticker(sticker, settings = {}){
+      saveState(){
+        const c = this.canvas;
+        const state = c.toObject();
+        if(!this.pauseSaving){
+
+          delete state.backgroundImage;
+          if(this.currentState){
+            this.undoStack.push(this.currentState);
+          }
+          this.currentState = state;
+          this.redoStack.length = 0;
+
+        }
+      },
+
+      undo(){
+        if(this.undoStack.length>0){
+          const action = this.undoStack.pop();
+          if(this.currentState){
+            this.redoStack.push(this.currentState);
+          }
+          this.loadFromHistory(action);
+          this.currentState = action;
+        }
+      },
+      redo(){
+        if(this.redoStack.length>0){
+          const action = this.redoStack.pop()
+          this.loadFromHistory(action);
+          if(this.currentState){
+            this.undoStack.push(this.currentState);
+          }
+          this.currentState = action;
+        }
+      },
+
+      loadFromHistory(state){
+        this.loadingHistory = true;
+        this.withoutSaving((resumeSaving)=>{
+          const c = this.canvas;
+          c.clear();
+          c.loadFromJSON(state, ()=>{
+
+            this.setBackgroundImage();
+            this.loadingHistory = false;
+            c.renderAll();
+            resumeSaving();
+          });
+
+        }, false);
+
+
+      },
+
+      addSticker(sticker, settings){
+        this.addStickerAsync(sticker, settings);
+      },
+
+      async addStickerAsync(sticker, settings = {}){
 
         let c = this.canvas;
 
@@ -309,28 +400,26 @@
 
         settings = Object.assign(defaultOptions, settings);
 
-        fabric.loadSVGFromURL(sticker.image, function(objects, options){
-         let obj = fabric.util.groupSVGElements(objects, options);
-         // if(settings.width>settings.height){
-          //   obj.scaleToHeight(settings.height).set({left: settings.left, top: settings.top}).setCoords();
-          // }
-          // else{
-          //   obj.scaleToWidth(settings.width).set({left: settings.left, top: settings.top}).setCoords();
-          // }
 
+        let objects, options;
 
-          const stickerPlacement = sticker.scaleToCoverFace(settings.left, settings.top, settings.width, settings.height);
-          obj.set({left: stickerPlacement.left, top: stickerPlacement.top, scaleX: stickerPlacement.scale, scaleY: stickerPlacement.scale}).setCoords();
+        await new Promise((resolve)=>{
+          fabric.loadSVGFromURL(sticker.image, (obj, opt)=>{
+            objects = obj;
+            options= opt;
+            resolve();
+          })
+        })
+        let obj = fabric.util.groupSVGElements(objects, options);
 
-
-         c.add(obj).renderAll();
+        const stickerPlacement = sticker.scaleToCoverFace(settings.left, settings.top, settings.width, settings.height);
+        obj.set({left: stickerPlacement.left, top: stickerPlacement.top, scaleX: stickerPlacement.scale, scaleY: stickerPlacement.scale}).setCoords();
+        obj.sourcePath = sticker.image;
+        c.add(obj).renderAll();
 
         c.setActiveObject(c.item(c.getObjects().length-1));
 
         c.renderAll();
-
-
-        })
       },
       selectAll(){
         const c = this.canvas;
@@ -349,14 +438,16 @@
 
       },
       removeAll(){
+          this.withoutSaving((resumeSaving)=>{
+            let c = this.canvas;
+            let stickers = c.getObjects();
+            stickers.forEach((sticker)=>{
+              c.remove(sticker);
+            });
+            c.renderAll();
+            resumeSaving();
+          })
 
-          let c = this.canvas;
-          let stickers = c.getObjects();
-          stickers.forEach((sticker)=>{
-
-            c.remove(sticker);
-          });
-          c.renderAll();
 
       },
       selectionSet(){
@@ -400,10 +491,15 @@
       },
 
       keyHandler(e){
+
+        const universalControl = ()=>{
+          return e.getModifierState('Meta') || e.getModifierState('Control');
+        }
+
         if(e.key === 'Delete' || e.key === 'Backspace'){
           this.removeItem();
         }
-        if(e.key === 'a' && (e.getModifierState('Meta') || e.getModifierState('Control'))){
+        if(e.key === 'a' && (universalControl())){
           this.selectAll();
         }
 
@@ -414,6 +510,15 @@
             step = 1;
           }
           this.moveSelection(e.key.toLowerCase().replace('arrow',''), step);
+        }
+
+
+
+        if((e.key === 'y' || ((e).key.toLowerCase() === 'z' && e.getModifierState('Shift'))) && universalControl()){
+          this.redo();
+        }
+        else if(e.key === 'z' && universalControl()){
+          this.undo();
         }
 
       }
@@ -430,6 +535,9 @@
       'selection:updated':this.selectionSet,
       'selection:cleared':this.selectionCleared,
       'mouse:down':this.clearControls,
+      'object:modified':this.saveState,
+      'object:added':this.saveState,
+      'object:removed':this.saveState,
 
     })
     },
