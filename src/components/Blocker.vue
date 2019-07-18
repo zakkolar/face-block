@@ -201,13 +201,15 @@
 
       },
 
-      autoCover(){
+      async autoCover(){
 
 
-        this.withoutSaving(async (resumeSaving, error)=>{
+
           this.detectingFaces = true;
           const detections = await this.detectFaces();
 
+          if(detections.length>0){
+            this.withoutSaving(async (resumeSaving, error)=>{
             let stickers = this.getStickerChoices();
             for(let i=0; i<detections.length; i++) {
               const detection = detections[i];
@@ -244,7 +246,17 @@
             this.detectingFaces = false;
             resumeSaving();
 
-        });
+          });
+
+
+          }
+          else{
+            this.detectingFaces = false;
+          }
+
+
+
+
 
 
       },
@@ -332,14 +344,12 @@
         const c = this.canvas;
         const state = c.toObject();
         if(!this.pauseSaving){
-
           delete state.backgroundImage;
           if(this.currentState){
             this.undoStack.push(this.currentState);
           }
           this.currentState = state;
           this.redoStack.length = 0;
-
         }
       },
 
