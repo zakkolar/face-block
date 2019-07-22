@@ -136,6 +136,7 @@
         this.image = null;
         this.removeAll();
         this.resetZoom();
+        this.resetAngle();
         const c = this.canvas;
         c.backgroundImage = false;
         c.renderAll();
@@ -179,6 +180,10 @@
 
         c.renderAll();
 
+      },
+
+      resetAngle(){
+        this.imageAngle = 0;
       },
 
 
