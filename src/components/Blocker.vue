@@ -166,7 +166,20 @@
         this.showStickers = false;
       },
 
+      rotateSticker(obj, rotation){
+        const c = this.canvas;
+        let canvasCenter = new fabric.Point(c.getWidth() / 2, c.getHeight() / 2) // center of canvas
+        let radians = fabric.util.degreesToRadians(rotation)
+        let objectOrigin = new fabric.Point(obj.left, obj.top)
+        let new_loc = fabric.util.rotatePoint(objectOrigin, canvasCenter, radians)
+        obj.top = new_loc.y
+        obj.left = new_loc.x
+        obj.angle += rotation //rotate each object by the same angle
+        obj.setCoords()
 
+        c.renderAll();
+
+      },
 
 
       rotateImage(rotation){
@@ -174,19 +187,14 @@
         this.setBackgroundImage();
 
         const c = this.canvas;
-        let canvasCenter = new fabric.Point(c.getWidth() / 2, c.getHeight() / 2) // center of canvas
-        let radians = fabric.util.degreesToRadians(rotation)
+        // let canvasCenter = new fabric.Point(c.getWidth() / 2, c.getHeight() / 2) // center of canvas
+        // let radians = fabric.util.degreesToRadians(rotation)
 
         c.getObjects().forEach((obj) => {
-          let objectOrigin = new fabric.Point(obj.left, obj.top)
-          let new_loc = fabric.util.rotatePoint(objectOrigin, canvasCenter, radians)
-          obj.top = new_loc.y
-          obj.left = new_loc.x
-          obj.angle += rotation //rotate each object by the same angle
-          obj.setCoords()
+          this.rotateSticker(obj, rotation);
         });
 
-        c.renderAll()
+        // c.renderAll()
 
         this.saveState();
 
@@ -275,12 +283,13 @@
 
 
 
-              await this.addStickerAsync(sticker, {
+              const obj = await this.addStickerAsync(sticker, {
                 height: height,
                 width: width,
                 left: left,
                 top: top
               });
+              this.rotateSticker(obj, this.imageAngle);
               if (stickers.length === 0) {
                 stickers = this.getStickerChoices();
               }
@@ -464,7 +473,7 @@
       },
 
       addSticker(sticker, settings){
-        this.addStickerAsync(sticker, settings);
+        return this.addStickerAsync(sticker, settings);
       },
 
       async addStickerAsync(sticker, settings = {}){
@@ -501,6 +510,8 @@
         c.setActiveObject(c.item(c.getObjects().length-1));
 
         c.renderAll();
+
+        return obj;
       },
       selectAll(){
         const c = this.canvas;
