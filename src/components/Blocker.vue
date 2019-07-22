@@ -43,6 +43,8 @@
     import * as faceapi from 'face-api.js';
     import stickers from "../stickers";
 
+    const Jimp = require('jimp');
+
     window.faceapi = faceapi;
 
 
@@ -216,7 +218,15 @@
           await this.getFaceDetectionNet().load('/models')
         }
         const options = this.getFaceDetectorOptions()
-        const results = await faceapi.detectAllFaces(this.image, options)
+
+        const image = await Jimp.read(Buffer.from(this.image.src.split(',')[1],'base64'));
+        image.rotate(this.imageAngle * -1);
+
+        const rotatedImage = new Image();
+        rotatedImage.src = await image.getBase64Async(Jimp.AUTO);
+        document.getElementsByTagName('body')[0].append(rotatedImage);
+
+        const results = await faceapi.detectAllFaces(rotatedImage, options)
         return results;
       },
 
@@ -294,7 +304,7 @@
                 left: left,
                 top: top
               });
-              this.rotateSticker(obj, this.imageAngle);
+              // this.rotateSticker(obj, this.imageAngle);
               if (stickers.length === 0) {
                 stickers = this.getStickerChoices();
               }

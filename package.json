@@ -13,6 +13,7 @@
     "fabric-with-gestures": "^3.2.0",
     "face-api.js": "^0.20.1",
     "file-saver": "^2.0.2",
+    "jimp": "^0.6.4",
     "rollup": "^1.16.7",
     "rollup-plugin-visualizer": "^1.1.1",
     "vue": "^2.6.10",
