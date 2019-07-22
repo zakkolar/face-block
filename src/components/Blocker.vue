@@ -11,6 +11,8 @@
         </label>
 
         <button class="btn btn-success" :disabled="!image" @click="saveImage"><i class="fa fa-save"></i> Save image</button>
+        <button class="btn btn-light" @click="rotateImage(-90)" :disabled="!image">Rotate left</button>
+        <button class="btn btn-light" @click="rotateImage(90)" :disabled="!image">Rotate right</button>
         <button @click="showStickers = !showStickers" :disabled="!image" id="stickerButton" class="btn btn-info">
          <i class="fa fa-smile-o" aria-hidden="true"></i> Stickers
         </button>
@@ -18,8 +20,8 @@
         <button class="btn btn-danger" :disabled="!selection" @click.prevent="removeItem"><i class="fa fa-trash" aria-hidden="true"></i> Remove selected stickers
         </button>
         <button class="btn btn-warning" @click="removeAll" :disabled="stickerCount == 0"><i class="fa fa-refresh" aria-hidden="true"></i> Remove all stickers</button>
-        <button class="btn btn-light" :disabled="loadingHistory || undoStack.length===0" @click="undo">Undo</button>
-        <button class="btn btn-light" :disabled="loadingHistory || redoStack.length===0" @click="redo">Redo</button>
+        <button class="btn btn-light" :disabled="!image || loadingHistory || undoStack.length===0" @click="undo">Undo</button>
+        <button class="btn btn-light" :disabled="!image || loadingHistory || redoStack.length===0" @click="redo">Redo</button>
 
 
 
@@ -87,6 +89,7 @@
         scale:1,
         imageWidth:1,
         imageHeight:1,
+        imageAngle: 0,
         image: null,
         detectingFaces: false,
         pauseSaving: false,
@@ -94,6 +97,9 @@
         redoStack: [],
         currentState: null,
         loadingHistory: false,
+        zoomFactor: 1,
+        maxZoomFactor: 2,
+        minZoomFactor: 0.5,
 
       }
     },
@@ -107,7 +113,16 @@
         return 0;
       }
     },
+     watch:{
+      scale: function(newScale, oldScale){
+        this.updateZoom();
+      },
+       zoomFactor: function(newZoom, oldZoom){
+        this.updateZoom();
+       }
+     },
     methods: {
+
 
       confirmNewImage(e){
         if(this.image && !confirm('Are you sure you wish to add a new image? This will erase your current one')) {
@@ -120,9 +135,11 @@
       clearImage(){
         this.image = null;
         this.removeAll();
+        this.resetZoom();
         const c = this.canvas;
         c.backgroundImage = false;
         c.renderAll();
+        this.clearHistory();
       },
       updateCanvasImage(e){
           let files = e.target.files;
@@ -135,9 +152,8 @@
             img.onload = ()=> {
               this.image = img;
 
-              this.removeAll();
-              this.setBackgroundImage();
-              this.clearHistory();
+                this.removeAll();
+                this.setBackgroundImage();
             }
             img.src = event.target.result;
           };
@@ -150,6 +166,32 @@
         this.showStickers = false;
       },
 
+
+
+
+      rotateImage(rotation){
+        this.imageAngle += rotation;
+        this.setBackgroundImage();
+
+        const c = this.canvas;
+        let canvasCenter = new fabric.Point(c.getWidth() / 2, c.getHeight() / 2) // center of canvas
+        let radians = fabric.util.degreesToRadians(rotation)
+
+        c.getObjects().forEach((obj) => {
+          let objectOrigin = new fabric.Point(obj.left, obj.top)
+          let new_loc = fabric.util.rotatePoint(objectOrigin, canvasCenter, radians)
+          obj.top = new_loc.y
+          obj.left = new_loc.x
+          obj.angle += rotation //rotate each object by the same angle
+          obj.setCoords()
+        });
+
+        c.renderAll()
+
+        this.saveState();
+
+      },
+
       clearHistory(){
         this.currentState = null;
         this.undoStack.length = 0;
@@ -160,12 +202,9 @@
         if (!this.isFaceDetectionModelLoaded()) {
           await this.getFaceDetectionNet().load('/models')
         }
-
         const options = this.getFaceDetectorOptions()
         const results = await faceapi.detectAllFaces(this.image, options)
         return results;
-
-
       },
 
       getFaceDetectionNet() {
@@ -184,10 +223,10 @@
         return shuffle(this.stickers);
       },
 
-      withoutSaving(cb, saveAtEnd = true){
+      withoutSaving(action, saveAtEnd = true){
         this.pauseSaving = true;
         new Promise((resolve, reject)=>{
-          cb(resolve, reject);
+          action(resolve, reject);
         }).then(()=>{
           this.pauseSaving = false;
           if(saveAtEnd){
@@ -202,8 +241,6 @@
       },
 
       async autoCover(){
-
-
 
           this.detectingFaces = true;
           const detections = await this.detectFaces();
@@ -226,10 +263,15 @@
               const imgLeft = centerX - (this.imageWidth / 2);
               const imgTop = centerY - (this.imageHeight / 2);
 
-              const width = this.scale * box.width;
-              const height = this.scale * box.height;
-              const left = (this.scale * box.x) + (imgLeft);
-              const top = (this.scale * box.y) + (imgTop);
+              // const width = this.scale * box.width;
+              // const height = this.scale * box.height;
+              // const left = (this.scale * box.x) + (imgLeft);
+              // const top = (this.scale * box.y) + (imgTop);
+
+              const width = box.width;
+              const height = box.height;
+              const left =  box.x + imgLeft;
+              const top = box.y + imgTop;
 
 
 
@@ -261,11 +303,42 @@
 
       },
 
+      updateZoom(){
+        const c = this.canvas;
+        const center = new fabric.Point(c.width/2,c.height/2);
+        const zoomLevel = this.scale * this.zoomFactor;
+        c.viewportTransform = [1,0,0,1,0,0]
+        c.zoomToPoint(center, zoomLevel);
+        c.renderAll();
+      },
+
+      resetZoom(){
+        this.zoomFactor = 1;
+      },
+
+      resetSize() {
+        let c = this.canvas;
+        this.resetZoom();
+        c.setWidth(window.innerWidth);
+        c.setHeight(window.innerHeight - document.getElementById('controls').clientHeight);
+        c.calcOffset();
+        c.renderAll();
+
+
+
+        document.getElementById('stickerList').style.left = document.getElementById('stickerButton').offsetLeft + "px";
+        document.getElementById('stickerList').style.bottom = (document.getElementById('controls').clientHeight - 10) + "px";
+
+        this.setBackgroundImage();
+      },
+
       setBackgroundImage(){
         let img = this.image;
         if(img){
           let c = this.canvas;
           let fImg = new fabric.Image(img);
+          fImg.rotate(this.imageAngle);
+
           let original_width = img.width;
           let original_height = img.height;
           let bound_width = c.width;
@@ -293,20 +366,17 @@
           this.imageWidth = new_width;
           this.imageHeight = new_height;
 
-
-
           c.setBackgroundImage(fImg, c.renderAll.bind(c),{
             originX: 'center',
             originY: 'center',
             left: c.width/2,
             top: c.height/2,
-            scaleX: new_width / img.width,
-            scaleY: new_height / img.height
-
+            scaleX: 1,
+            scaleY: 1
           });
 
+          this.updateZoom();
         }
-
       },
 
       removeItem(){
@@ -318,16 +388,13 @@
           c.discardActiveObject();
           resumeSaving();
         })
-
-
-
       },
       saveImage(){
         let c = this.canvas;
         let image = c.toDataURL({
           format: 'jpeg',
           quality: 0.8,
-          multiplier: 1/this.scale,
+          multiplier: 1/(this.scale*this.zoom),
           width: this.imageWidth,
           height: this.imageHeight,
           left: (c.width - this.imageWidth)/2,
@@ -342,7 +409,10 @@
       },
       saveState(){
         const c = this.canvas;
-        const state = c.toObject();
+        const state = {
+          canvas: c.toObject(),
+          imageAngle: this.imageAngle
+        };
         if(!this.pauseSaving){
           delete state.backgroundImage;
           if(this.currentState){
@@ -379,7 +449,8 @@
         this.withoutSaving((resumeSaving)=>{
           const c = this.canvas;
           c.clear();
-          c.loadFromJSON(state, ()=>{
+          this.imageAngle = state.imageAngle;
+          c.loadFromJSON(state.canvas, ()=>{
 
             this.setBackgroundImage();
             this.loadingHistory = false;
@@ -447,7 +518,7 @@
           }
 
       },
-      removeAll(){
+      removeAll(saveAfter = false){
           this.withoutSaving((resumeSaving)=>{
             let c = this.canvas;
             let stickers = c.getObjects();
@@ -456,7 +527,7 @@
             });
             c.renderAll();
             resumeSaving();
-          })
+          }, saveAfter);
 
 
       },
@@ -466,15 +537,7 @@
       selectionCleared(){
         this.selection = false;
       },
-      resetSize() {
-        let c = this.canvas;
-        c.setWidth(window.innerWidth);
-        c.setHeight(window.innerHeight - document.getElementById('controls').clientHeight);
-        document.getElementById('stickerList').style.left = document.getElementById('stickerButton').offsetLeft + "px";
-        document.getElementById('stickerList').style.bottom = (document.getElementById('controls').clientHeight - 10) + "px";
 
-        this.setBackgroundImage();
-      },
 
       moveSelection(direction, step){
         const canvas = this.canvas;
@@ -531,6 +594,18 @@
           this.undo();
         }
 
+      },
+      setZoom(opt){
+        if(this.image){
+          const delta = opt.e.deltaY;
+          let zoom = this.zoomFactor;
+          zoom = zoom + delta/200;
+          if (zoom > this.maxZoomFactor) zoom = this.maxZoomFactor;
+          if (zoom < this.minZoomFactor) zoom = this.minZoomFactor;
+          this.zoomFactor = zoom;
+          opt.e.preventDefault();
+          opt.e.stopPropagation();
+        }
       }
 
     },
@@ -548,6 +623,7 @@
       'object:modified':this.saveState,
       'object:added':this.saveState,
       'object:removed':this.saveState,
+      'mouse:wheel':this.setZoom,
 
     })
     },
