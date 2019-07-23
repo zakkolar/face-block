@@ -155,8 +155,8 @@
             img.onload = ()=> {
               this.image = img;
 
-                this.removeAll();
                 this.setBackgroundImage();
+                this.saveState();
             }
             img.src = event.target.result;
           };
@@ -224,8 +224,6 @@
 
         const rotatedImage = new Image();
         rotatedImage.src = await image.getBase64Async(Jimp.AUTO);
-        document.getElementsByTagName('body')[0].append(rotatedImage);
-
         const results = await faceapi.detectAllFaces(rotatedImage, options)
         return results;
       },
@@ -283,18 +281,16 @@
               const centerX = c.width / 2;
               const centerY = c.height / 2;
 
-              const imgLeft = centerX - (this.imageWidth / 2);
-              const imgTop = centerY - (this.imageHeight / 2);
 
-              // const width = this.scale * box.width;
-              // const height = this.scale * box.height;
-              // const left = (this.scale * box.x) + (imgLeft);
-              // const top = (this.scale * box.y) + (imgTop);
+              const imgLeft = (centerX) - (this.imageWidth / 2);
+              const imgTop = (centerY) - (this.imageHeight / 2);
 
               const width = box.width;
               const height = box.height;
               const left =  box.x + imgLeft;
               const top = box.y + imgTop;
+
+              const background = c.backgroundImage;
 
 
 
@@ -387,8 +383,8 @@
             this.scale = new_width / original_width;
           }
 
-          this.imageWidth = new_width;
-          this.imageHeight = new_height;
+          this.imageWidth = original_width;
+          this.imageHeight = original_height;
 
           c.setBackgroundImage(fImg, c.renderAll.bind(c),{
             originX: 'center',
@@ -518,7 +514,12 @@
         let obj = fabric.util.groupSVGElements(objects, options);
 
         const stickerPlacement = sticker.scaleToCoverFace(settings.left, settings.top, settings.width, settings.height);
-        obj.set({left: stickerPlacement.left, top: stickerPlacement.top, scaleX: stickerPlacement.scale, scaleY: stickerPlacement.scale}).setCoords();
+        obj.set({
+          left: stickerPlacement.left,
+          top: stickerPlacement.top,
+          scaleX: stickerPlacement.scale,
+          scaleY: stickerPlacement.scale,
+        }).setCoords();
         obj.sourcePath = sticker.image;
         c.add(obj).renderAll();
 
