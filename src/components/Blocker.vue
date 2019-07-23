@@ -39,13 +39,22 @@
   <script>
     /* eslint-disable */
     import {fabric} from 'fabric-with-gestures';
+    fabric.Group.prototype.stateProperties.push('distanceFromImageTop');
+    fabric.Group.prototype.stateProperties.push('distanceFromImageLeft');
+    fabric.Group.prototype.toObject = (function (toObject) {
+      return function (properties) {
+        return fabric.util.object.extend(toObject.call(this, properties), {
+          distanceFromImageTop: this.distanceFromImageTop,
+          distanceFromImageLeft: this.distanceFromImageLeft,
+        });
+      };
+    })(fabric.Group.prototype.toObject);
 
     import * as faceapi from 'face-api.js';
+    window.faceapi = faceapi;
     import stickers from "../stickers";
 
     const Jimp = require('jimp');
-
-    window.faceapi = faceapi;
 
 
     // const resetSizeEvents = ['resize','orientationchange'];
@@ -395,6 +404,8 @@
             scaleY: 1
           });
 
+          this.restoreAllRelativePositions();
+
           this.updateZoom();
         }
       },
@@ -487,6 +498,57 @@
         return this.addStickerAsync(sticker, settings);
       },
 
+      calculateRelativePosition(obj){
+        const c = this.canvas;
+        const canvasCenterX = c.width / 2;
+        const canvasCenterY = c.height / 2;
+
+        const imgLeft = (canvasCenterX) - (this.imageWidth / 2);
+        const imgTop = (canvasCenterY) - (this.imageHeight / 2);
+
+        const distanceFromImageLeft = obj.left - imgLeft;
+        const distanceFromImageTop = obj.top - imgTop;
+
+        obj.set({
+          distanceFromImageLeft,
+          distanceFromImageTop
+        })
+
+
+      },
+
+      restoreAllRelativePositions(){
+
+
+          const c = this.canvas;
+          c.getObjects().forEach((obj)=>{
+            this.restoreRelativePosition(obj);
+          });
+          c.renderAll();
+
+
+
+      },
+
+      restoreRelativePosition(obj){
+        const c = this.canvas;
+
+        const canvasCenterX = c.width / 2;
+        const canvasCenterY = c.height / 2;
+
+        const imgLeft = (canvasCenterX) - (this.imageWidth / 2);
+        const imgTop = (canvasCenterY) - (this.imageHeight / 2);
+
+        const top = imgTop + obj.distanceFromImageTop;
+        const left = imgLeft + obj.distanceFromImageLeft;
+
+
+        obj.set({
+          left,
+          top
+        }).setCoords();
+      },
+
       async addStickerAsync(sticker, settings = {}){
 
         let c = this.canvas;
@@ -514,12 +576,19 @@
         let obj = fabric.util.groupSVGElements(objects, options);
 
         const stickerPlacement = sticker.scaleToCoverFace(settings.left, settings.top, settings.width, settings.height);
+
+
+
         obj.set({
           left: stickerPlacement.left,
           top: stickerPlacement.top,
           scaleX: stickerPlacement.scale,
           scaleY: stickerPlacement.scale,
         }).setCoords();
+
+        this.calculateRelativePosition(obj);
+
+
         obj.sourcePath = sticker.image;
         c.add(obj).renderAll();
 
@@ -586,6 +655,9 @@
               break;
           }
           activeObject.setCoords();
+         activeObject.getObjects().forEach((obj)=>{
+           canvas.fire('object:modified', {target: obj});
+         });
           canvas.renderAll();
         }
       },
@@ -647,7 +719,10 @@
       'selection:updated':this.selectionSet,
       'selection:cleared':this.selectionCleared,
       'mouse:down':this.clearControls,
-      'object:modified':this.saveState,
+      'object:modified':(e)=>{
+        this.calculateRelativePosition(e.target);
+        this.saveState();
+      },
       'object:added':this.saveState,
       'object:removed':this.saveState,
       'mouse:wheel':this.setZoom,
