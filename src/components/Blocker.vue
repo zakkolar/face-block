@@ -111,6 +111,7 @@
         zoomFactor: 1,
         maxZoomFactor: 2,
         minZoomFactor: 0.5,
+        pausePanning: false
 
       }
     },
@@ -694,16 +695,39 @@
         }
 
       },
-      setZoom(opt){
+      changeZoom(zoom){
         if(this.image){
-          const delta = opt.e.deltaY;
-          let zoom = this.zoomFactor;
-          zoom = zoom + delta/200;
           if (zoom > this.maxZoomFactor) zoom = this.maxZoomFactor;
           if (zoom < this.minZoomFactor) zoom = this.minZoomFactor;
           this.zoomFactor = zoom;
+        }
+      },
+      zoomFromMouse(opt){
+        if(this.image){
+          const delta = opt.e.deltaY/200;
+          this.changeZoom(this.zoomFactor + delta);
           opt.e.preventDefault();
           opt.e.stopPropagation();
+        }
+      },
+      zoomFromTouch(opts){
+        console.log('zooming');
+        if (opts.e.touches && opts.e.touches.length == 2) {
+          this.pausePanning = true;
+          const point = new fabric.Point(opts.self.x, opts.self.y);
+          // if (opts.self.state === "start") {
+          //   zoomStartScale = self.canvas.getZoom();
+          // }
+          let delta = opts.self.scale;
+          if(delta>=1){
+            delta = (delta/10) + 1;
+          }
+          else{
+
+          }
+          this.changeZoom(delta * this.zoomFactor);
+          console.log(delta);
+          this.pausePanning = false;
         }
       }
 
@@ -725,7 +749,8 @@
       },
       'object:added':this.saveState,
       'object:removed':this.saveState,
-      'mouse:wheel':this.setZoom,
+      'mouse:wheel':this.zoomFromMouse,
+      'touch:gesture':this.zoomFromTouch
 
     })
     },
