@@ -557,9 +557,11 @@
         const defaultOptions = {
           left: c.width/2,
           top: c.height/2,
-          width: 50,
-          height: 50
+          width: 50 / this.scale,
+          height: 50 / this.scale
         }
+
+        console.log(this.scale);
 
 
         settings = Object.assign(defaultOptions, settings);
